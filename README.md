@@ -30,8 +30,7 @@ SmartFlash adalah platform pembelajaran flashcard yang menggabungkan teknik spac
 
 ### 🔄 Manajemen Flashcard
 - Tambah, edit, dan hapus flashcard individual 
-- Upload gambar dan audio untuk flashcard multimedia
-- Copy dan pindahkan flashcard antar deck 
+- Copy dan pindahkan flashcard antar deck layaknya menggunakan flashcard fisik
 
 ## Struktur Folder Proyek
 
