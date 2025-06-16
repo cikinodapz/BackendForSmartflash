@@ -13,24 +13,24 @@ SmartFlash adalah platform pembelajaran flashcard yang menggabungkan teknik spac
 
 ### 📚 Manajemen Deck Flashcard
 - Buat, edit, dan hapus deck flashcard 
+- Copy dan pindahkan flashcard antar deck layaknya menggunakan flashcard fisik
+
+### 🔭 Eksplorasi Deck Publik
 - Akses deck publik dari komunitas 
 - Sistem upvote dan komentar untuk deck 
 - Copy deck dari pengguna lain ke koleksi pribadi
+- Memberi feedback atau komentar pada deck
 
 ### 🤖 Fitur AI dan Pembelajaran Cerdas
-- Pembuatan flashcard otomatis menggunakan AI 
 - Quiz mode dengan multiple choice yang dihasilkan AI 
 - Algoritma spaced repetition (SM-2) untuk optimasi pembelajaran
-- Analitik pembelajaran berbasis AI 
+- Analitik pembelajaran berdasarkan riwayat kuis
 
 ### 📊 Tracking dan Analitik
 - Statistik pembelajaran personal 
 - Progress mingguan dan riwayat pembelajaran 
 - Rekomendasi pembelajaran yang dipersonalisasi
 
-### 🔄 Manajemen Flashcard
-- Tambah, edit, dan hapus flashcard individual 
-- Copy dan pindahkan flashcard antar deck layaknya menggunakan flashcard fisik
 
 ## Struktur Folder Proyek
 
@@ -107,7 +107,7 @@ BackendForSmartflash/
 
 ## Database Seeding
 
-Proyek ini sudah dilengkapi dengan database seeder untuk membuat data awal pengembangan. [15]
+Proyek ini sudah dilengkapi dengan database seeder untuk membuat data awal pengembangan.
 
 Seeder akan membuat 2 akun test:
 - **Email**: `mugiwara@gmail.com`, **Password**: `password123`, **Nama**: "Daffa Gans"
@@ -141,5 +141,8 @@ Seeder akan membuat 2 akun test:
 ### Development Tools
 - **nodemon** (^3.1.9): Development server dengan hot reload
 - **morgan** (~1.9.1): HTTP request logger
+
+## Frontend Aplikasi
+- Akses source kode nya di repo berikut https://github.com/cikinodapz/FrontendForSmartflash.git 
 
 
