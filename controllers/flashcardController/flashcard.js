@@ -2245,6 +2245,265 @@ const getLearningStats = async (req, res) => {
   }
 };
 
+// Tambahkan ini di antara deklarasi handler lain di controllers/flashcardController/flashcard.js
+
+const startMatch = async (req, res) => {
+  try {
+    const { id } = req.params; // Deck ID
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    // Cari deck beserta flashcards-nya
+    const deck = await prisma.deck.findUnique({
+      where: { id },
+      include: { flashcards: true },
+    });
+
+    if (!deck) {
+      return res.status(404).json({ error: "Deck tidak ditemukan" });
+    }
+
+    // Pastikan jumlah flashcard minimal 2
+    if (deck.flashcards.length < 2) {
+      return res.status(400).json({
+        error: "Minimal harus ada 2 flashcard untuk memulai match",
+      });
+    }
+
+    // Format flashcards menjadi daftar pertanyaan dan jawaban
+    const questions = deck.flashcards.map((card) => ({
+      id: card.id,
+      question: card.question,
+      imageUrl: card.imageUrl ?? null,
+      audioUrl: card.audioUrl ?? null,
+    }));
+
+    const answers = deck.flashcards.map((card) => ({
+      id: card.id,
+      answer: card.answer,
+    }));
+
+    // Fungsi untuk mengacak urutan array
+    const shuffle = (array) => array.sort(() => Math.random() - 0.5);
+
+    const shuffledQuestions = shuffle([...questions]);
+    const shuffledAnswers = shuffle([...answers]);
+
+    return res.status(200).json({
+      message: "Match dimulai",
+      match: {
+        deckId: deck.id,
+        deckName: deck.name,
+        questions: shuffledQuestions,
+        answers: shuffledAnswers,
+      },
+    });
+  } catch (error) {
+    console.error("Error memulai match:", error);
+    return res.status(500).json({ error: "Terjadi kesalahan server" });
+  }
+};
+
+// Tambahkan atau ganti handler lama dengan ini
+const submitMatchAnswers = async (req, res) => {
+  try {
+    const { id } = req.params;     // Deck ID
+    const { matches } = req.body;  // Array of { questionId, answerId }
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    if (!Array.isArray(matches) || matches.length === 0) {
+      return res.status(400).json({ error: "Matches array is required" });
+    }
+
+    // Ambil deck beserta flashcards
+    const deck = await prisma.deck.findUnique({
+      where: { id },
+      include: { flashcards: true },
+    });
+
+    if (!deck) {
+      return res.status(404).json({ error: "Deck tidak ditemukan" });
+    }
+
+    if (deck.flashcards.length < 2) {
+      return res.status(400).json({
+        error: "Minimal harus ada 2 flashcard untuk match",
+      });
+    }
+
+    // Helper dari submitAnswer (SM-2)
+    const calculateNextReview = (currentProgress, correct, responseTime) => {
+      let { easeFactor, interval, repetitions } = currentProgress;
+      // Tentukan quality
+      let quality;
+      if (!correct) {
+        quality = 0;
+      } else {
+        const baseQuality = 4;
+        if (responseTime) {
+          const timeBonus =
+            responseTime < 5000 ? 1 : responseTime < 15000 ? 0 : -1;
+          quality = Math.max(0, Math.min(5, baseQuality + timeBonus));
+        } else {
+          quality = baseQuality;
+        }
+      }
+
+      // Update easeFactor
+      easeFactor = Math.max(
+        1.3,
+        easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02))
+      );
+
+      // Update interval dan repetitions
+      if (correct) {
+        repetitions += 1;
+        if (repetitions === 1) {
+          interval = 1;
+        } else if (repetitions === 2) {
+          interval = 6;
+        } else {
+          interval = Math.round(interval * easeFactor);
+        }
+      } else {
+        repetitions = 0;
+        interval = 1;
+      }
+
+      // Hitung next review
+      const nextReview = new Date();
+      nextReview.setDate(nextReview.getDate() + interval);
+
+      const isLearned = correct && repetitions >= 3 && interval >= 14;
+
+      return {
+        easeFactor,
+        interval,
+        repetitions,
+        nextReview,
+        isLearned,
+        quality,
+      };
+    };
+
+    let correctCount = 0;
+    const results = [];
+
+    for (const match of matches) {
+      const { questionId, answerId } = match;
+      const questionCard = deck.flashcards.find((fc) => fc.id === questionId);
+      const answerCard   = deck.flashcards.find((fc) => fc.id === answerId);
+      if (!questionCard || !answerCard) continue;
+
+      const isCorrect = questionId === answerId;
+      if (isCorrect) correctCount++;
+
+      // Ambil progress atau nilai default
+      let existingProgress;
+      try {
+        existingProgress = await prisma.progress.findFirst({
+          where: { userId, flashcardId: questionId },
+        });
+      } catch (err) {
+        existingProgress = null;
+      }
+
+      const defaultProgress = {
+        easeFactor: 2.5,
+        interval: 1,
+        repetitions: 0,
+        nextReview: new Date(),
+        isLearned: false,
+        totalReviews: 0,
+        correctReviews: 0,
+      };
+      const currentProgress = existingProgress || defaultProgress;
+
+      // Hitung progres baru
+      const newProgress = calculateNextReview(currentProgress, isCorrect, null);
+
+      if (existingProgress) {
+        await prisma.progress.update({
+          where: { id: existingProgress.id },
+          data: {
+            easeFactor: newProgress.easeFactor,
+            interval: newProgress.interval,
+            repetitions: newProgress.repetitions,
+            nextReview: newProgress.nextReview,
+            lastReviewed: new Date(),
+            isLearned: newProgress.isLearned,
+            totalReviews: { increment: 1 },
+            correctReviews: isCorrect ? { increment: 1 } : undefined,
+          },
+        });
+      } else {
+        await prisma.progress.create({
+          data: {
+            userId,
+            flashcardId: questionId,
+            easeFactor: newProgress.easeFactor,
+            interval: newProgress.interval,
+            repetitions: newProgress.repetitions,
+            nextReview: newProgress.nextReview,
+            isLearned: newProgress.isLearned,
+            totalReviews: 1,
+            correctReviews: isCorrect ? 1 : 0,
+          },
+        });
+      }
+
+      // History tetap mencatat status (MASTERED/NEEDS_REVIEW)
+      await prisma.history.create({
+        data: {
+          userId,
+          flashcardId: questionId,
+          deckId: id,
+          userAnswer: answerCard.answer,
+          isCorrect,
+          status: isCorrect ? "MASTERED" : "NEEDS_REVIEW",
+        },
+      });
+
+      results.push({ questionId, answerId, isCorrect });
+    }
+
+    // Hitung progres deck berdasarkan isLearned
+    const totalFlashcards = deck.flashcards.length;
+    const masteredFlashcards = await prisma.progress.count({
+      where: {
+        userId,
+        flashcardId: { in: deck.flashcards.map((fc) => fc.id) },
+        isLearned: true,
+      },
+    });
+    const percentage =
+      totalFlashcards > 0
+        ? Math.round((masteredFlashcards / totalFlashcards) * 100)
+        : 0;
+
+    return res.status(200).json({
+      message: "Jawaban match disimpan",
+      totalMatches: matches.length,
+      correctMatches: correctCount,
+      incorrectMatches: matches.length - correctCount,
+      results,
+      progress: {
+        total: totalFlashcards,
+        mastered: masteredFlashcards,
+        percentage,
+      },
+    });
+  } catch (error) {
+    console.error("Error processing match answers:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
 // Tambahkan route di router
 
 module.exports = {
@@ -2269,4 +2528,6 @@ module.exports = {
   answerFlashcard,
   getLearningHistory,
   getLearningStats,
+  startMatch,
+  submitMatchAnswers,
 };

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middlewares/auth.middleware'); // Middleware untuk verifikasi token
-const { getFlashcardsByDeck,createFlashcard, updateFlashcard, deleteFlashcard, startQuiz, answerFlashcard, copyFlashcardsToDeck, moveFlashcardsToDeck, startQuizLocal, startQuizDua, getLearningHistory, getLearningStats, QuizMode, submitAnswer, getStats, getUserStats, submitQuizAnswers, getWeeklyProgress, QuizModeByPublic, generateAnalytics, getUserAnalytics, getAnalyticsByCategory, autoGenerateAnalytics, createAutoFlashcards, generateFlashcards } = require('../controllers/flashcardController/flashcard');
+const { getFlashcardsByDeck,createFlashcard, updateFlashcard, deleteFlashcard, startQuiz, answerFlashcard, copyFlashcardsToDeck, moveFlashcardsToDeck, startQuizLocal, startQuizDua, getLearningHistory, getLearningStats, QuizMode, submitAnswer, getStats, getUserStats, submitQuizAnswers, getWeeklyProgress, QuizModeByPublic, generateAnalytics, getUserAnalytics, getAnalyticsByCategory, autoGenerateAnalytics, createAutoFlashcards, generateFlashcards, startMatch, submitMatchAnswers } = require('../controllers/flashcardController/flashcard');
 
 //flashcard manage
 router.post('/addCard/:id', authMiddleware, createFlashcard);
@@ -31,5 +31,10 @@ router.get("/stats", authMiddleware, getLearningStats);
 //extended
 router.post('/decks/:targetDeckId/copy-flashcards', authMiddleware, copyFlashcardsToDeck); //fitur copy
 router.post('/flashcards/move', authMiddleware, moveFlashcardsToDeck);//fitur cut
+
+// Tambahkan ini di bawah route kuis lainnya
+router.get('/match/start/:id', authMiddleware, startMatch);
+router.post('/match/answer/:id', authMiddleware, submitMatchAnswers); // Tambahkan route untuk submit jawaban match
+
 
 module.exports = router;
