@@ -503,7 +503,7 @@ const getNearestReviewDeck = async (req, res) => {
       },
     });
 
-    // If no flashcard is found
+    // If no flashcard is found (e.g., new user)
     if (!nearestProgress) {
       return res.status(200).json({
         message: "No flashcards available for review",
@@ -512,22 +512,6 @@ const getNearestReviewDeck = async (req, res) => {
     }
 
     const deck = nearestProgress.flashcard.deck;
-
-    // Check if the user has access to the deck
-    const hasAccess =
-      deck.userId === userId ||
-      (await prisma.sharedDeck.findFirst({
-        where: {
-          deckId: deck.id,
-          userId,
-        },
-      }));
-
-    if (!hasAccess) {
-      return res
-        .status(403)
-        .json({ error: "You do not have access to this deck" });
-    }
 
     // Fetch additional progress stats for the deck
     const deckProgress = await prisma.progress.aggregate({
@@ -585,13 +569,16 @@ const getNearestReviewDeck = async (req, res) => {
       },
     };
 
-    res.status(200).json({
+    return res.status(200).json({
       message: "Nearest review deck retrieved successfully",
       data: response,
     });
   } catch (error) {
     console.error("Error fetching nearest review deck:", error);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ 
+      error: "Internal server error",
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   } finally {
     await prisma.$disconnect();
   }

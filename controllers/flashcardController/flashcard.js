@@ -67,7 +67,7 @@ const getFlashcardsByDeck = async (req, res) => {
 const createFlashcard = async (req, res) => {
   try {
     const { id } = req.params; // Deck ID from URL
-    const { question, answer, imageUrl, audioUrl, tags } = req.body;
+    const { question, answer, imageUrl, audioUrl, tags, difficulty } = req.body;
 
     // Validate required fields
     if (!question || !answer) {
@@ -75,6 +75,9 @@ const createFlashcard = async (req, res) => {
         .status(400)
         .json({ error: "Question and answer are required" });
     }
+
+    // Validate difficulty (must be a number between 1 and 10)
+    const validatedDifficulty = Math.max(1, Math.min(10, Number(difficulty) || 1));
 
     // Get userId from authMiddleware
     const userId = req.user?.id;
@@ -103,6 +106,7 @@ const createFlashcard = async (req, res) => {
         imageUrl: imageUrl || null,
         audioUrl: audioUrl || null,
         tags: tags || [],
+        difficulty: validatedDifficulty,
         deckId: id,
       },
       select: {
@@ -112,6 +116,7 @@ const createFlashcard = async (req, res) => {
         imageUrl: true,
         audioUrl: true,
         tags: true,
+        difficulty: true,
         deckId: true,
         createdAt: true,
         updatedAt: true,
@@ -1008,14 +1013,18 @@ const submitAnswer = async (req, res) => {
       );
 
       // Update repetitions and interval
-      if (!correct) {
-        // Incorrect answer - reset
-        repetitions = 0;
-        interval = 1;
+      if (correct) {
+        repetitions += 1;
+        if (repetitions === 1) {
+          interval = 1; // Hari pertama
+        } else if (repetitions === 2) {
+          interval = 6; // Hari keenam
+        } else {
+          interval = Math.round(interval * easeFactor); // Interval berikutnya
+        }
       } else {
-        // Correct answer - mark as mastered immediately
-        repetitions = 1;
-        interval = 1;
+        repetitions = 0;
+        interval = 1; // Reset untuk jawaban salah
       }
 
       // Calculate next review date
@@ -1023,7 +1032,7 @@ const submitAnswer = async (req, res) => {
       nextReview.setDate(nextReview.getDate() + interval);
 
       // Mark as learned if answer is correct
-      const isLearned = correct;
+      const isLearned = correct && repetitions >= 3 && interval >= 14;
 
       return {
         easeFactor,
