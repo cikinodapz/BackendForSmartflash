@@ -34,6 +34,8 @@ model User {
   Upvote Upvote[]
 
   Comment Comment[]
+
+  DeckGroup DeckGroup[]
 }
 
 model Deck {
@@ -50,6 +52,8 @@ model Deck {
   updatedAt   DateTime     @updatedAt
   Upvote Upvote[]
   Comment Comment[]
+
+  DeckGroup DeckGroup[] @relation("DeckGroupToDeck")
 }
 
 model Flashcard {
@@ -142,4 +146,16 @@ model Comment {
   content   String // Comment text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model DeckGroup {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  isPublic    Boolean      @default(false)
+  user        User         @relation(fields: [userId], references: [id])
+  userId      String       @db.Uuid
+  decks       Deck[]       @relation("DeckGroupToDeck")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }

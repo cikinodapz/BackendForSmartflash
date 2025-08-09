@@ -1,6 +1,6 @@
 
 const express = require('express');
-const { createDeck,getDecks,updateDeck,deleteDeck, getDeckById, getUserProfile, getPublicDecks, getLearningContribution, upvoteDeck, copyDeck, addComment, getComments, getUpvoteCount, getNearestReviewDeck} = require('../controllers/deckController/deck');
+const { createDeck,getDecks,updateDeck,deleteDeck, getDeckById, getUserProfile, getPublicDecks, getLearningContribution, upvoteDeck, copyDeck, addComment, getComments, getUpvoteCount, getNearestReviewDeck, createDeckGroup, getDeckGroups, getDeckGroupById, updateDeckGroup, deleteDeckGroup} = require('../controllers/deckController/deck');
 const authMiddleware = require('../middlewares/auth.middleware'); 
 const router = express.Router();
 
@@ -21,5 +21,12 @@ router.get('/decks/:id/upvotes', getUpvoteCount);
 router.post('/decks/:id/copy', authMiddleware, copyDeck);
 router.post('/decks/:id/comment', authMiddleware, addComment);
 router.get('/decks/:id/comments', getComments);
+
+//deck group manage
+router.post('/create-deck-gruops', authMiddleware, createDeckGroup);
+router.get('/deck-groups', authMiddleware, getDeckGroups);
+router.get('/deck-groups/:id', authMiddleware, getDeckGroupById);
+router.put('/edit-deck-groups/:id', authMiddleware, updateDeckGroup);
+router.delete('/delete-deck-groups/:id', authMiddleware, deleteDeckGroup);
 
 module.exports = router;

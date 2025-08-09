@@ -888,7 +888,210 @@ const getComments = async (req, res) => {
   }
 };
 
+// Create a new deck group
+const createDeckGroup = async (req, res) => {
+  try {
+    const { name, description, deckIds, isPublic } = req.body;
+    const userId = req.user?.id;
 
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    if (!name) {
+      return res.status(400).json({ error: "Name is required" });
+    }
+
+    // Validasi deckIds jika ada
+    if (deckIds && !Array.isArray(deckIds)) {
+      return res.status(400).json({ error: "deckIds must be an array" });
+    }
+
+    // Cek apakah semua deck yang dimasukkan ada dan milik user
+    if (deckIds && deckIds.length > 0) {
+      const decks = await prisma.deck.findMany({
+        where: {
+          id: { in: deckIds },
+          userId,
+        },
+      });
+      if (decks.length !== deckIds.length) {
+        return res.status(400).json({ error: "One or more decks are invalid or not owned by user" });
+      }
+    }
+
+    const deckGroup = await prisma.deckGroup.create({
+      data: {
+        name,
+        description,
+        isPublic: isPublic || false,
+        userId,
+        decks: deckIds ? { connect: deckIds.map(id => ({ id })) } : undefined,
+      },
+      include: { decks: true },
+    });
+
+    return res.status(201).json({
+      message: "Deck group created successfully",
+      deckGroup,
+    });
+  } catch (error) {
+    console.error("Error creating deck group:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Get all deck groups for a user
+const getDeckGroups = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    const deckGroups = await prisma.deckGroup.findMany({
+      where: { userId },
+      include: { decks: { include: { flashcards: true } } },
+    });
+
+    return res.status(200).json({
+      message: "Deck groups retrieved successfully",
+      deckGroups,
+    });
+  } catch (error) {
+    console.error("Error retrieving deck groups:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Get a specific deck group by ID
+const getDeckGroupById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    const deckGroup = await prisma.deckGroup.findUnique({
+      where: { id },
+      include: { decks: { include: { flashcards: true } } },
+    });
+
+    if (!deckGroup) {
+      return res.status(404).json({ error: "Deck group not found" });
+    }
+
+    if (deckGroup.userId !== userId && !deckGroup.isPublic) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    return res.status(200).json({
+      message: "Deck group retrieved successfully",
+      deckGroup,
+    });
+  } catch (error) {
+    console.error("Error retrieving deck group:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Update a deck group
+const updateDeckGroup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, deckIds, isPublic } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    const deckGroup = await prisma.deckGroup.findUnique({
+      where: { id },
+    });
+
+    if (!deckGroup) {
+      return res.status(404).json({ error: "Deck group not found" });
+    }
+
+    if (deckGroup.userId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Validasi deckIds jika ada
+    if (deckIds && !Array.isArray(deckIds)) {
+      return res.status(400).json({ error: "deckIds must be an array" });
+    }
+
+    // Cek apakah semua deck yang dimasukkan ada dan milik user
+    if (deckIds && deckIds.length > 0) {
+      const decks = await prisma.deck.findMany({
+        where: {
+          id: { in: deckIds },
+          userId,
+        },
+      });
+      if (decks.length !== deckIds.length) {
+        return res.status(400).json({ error: "One or more decks are invalid or not owned by user" });
+      }
+    }
+
+    const updatedDeckGroup = await prisma.deckGroup.update({
+      where: { id },
+      data: {
+        name: name || deckGroup.name,
+        description: description !== undefined ? description : deckGroup.description,
+        isPublic: isPublic !== undefined ? isPublic : deckGroup.isPublic,
+        decks: deckIds ? { set: deckIds.map(id => ({ id })) } : undefined,
+      },
+      include: { decks: true },
+    });
+
+    return res.status(200).json({
+      message: "Deck group updated successfully",
+      deckGroup: updatedDeckGroup,
+    });
+  } catch (error) {
+    console.error("Error updating deck group:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Delete a deck group
+const deleteDeckGroup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    const deckGroup = await prisma.deckGroup.findUnique({
+      where: { id },
+    });
+
+    if (!deckGroup) {
+      return res.status(404).json({ error: "Deck group not found" });
+    }
+
+    if (deckGroup.userId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    await prisma.deckGroup.delete({
+      where: { id },
+    });
+
+    return res.status(200).json({
+      message: "Deck group deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting deck group:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   getDecks,
@@ -905,4 +1108,9 @@ module.exports = {
   copyDeck,
   addComment,
   getComments,
+  createDeckGroup,
+  getDeckGroups,
+  getDeckGroupById,
+  updateDeckGroup,
+  deleteDeckGroup,
 };
