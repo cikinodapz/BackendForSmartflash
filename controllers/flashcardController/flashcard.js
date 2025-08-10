@@ -77,7 +77,10 @@ const createFlashcard = async (req, res) => {
     }
 
     // Validate difficulty (must be a number between 1 and 10)
-    const validatedDifficulty = Math.max(1, Math.min(10, Number(difficulty) || 1));
+    const validatedDifficulty = Math.max(
+      1,
+      Math.min(10, Number(difficulty) || 1)
+    );
 
     // Get userId from authMiddleware
     const userId = req.user?.id;
@@ -596,7 +599,7 @@ const QuizMode = async (req, res) => {
       };
     });
 
-    // Fungsi untuk menghasilkan distractors dengan Hugging Face
+    // Fungsi untuk menghasilkan distractors dengan Mistral AI API
     const generateDistractors = async (question, correctAnswer) => {
       try {
         const prompt = `
@@ -606,18 +609,34 @@ const QuizMode = async (req, res) => {
           Format the output as a list, one distractor per line, without numbers, quotes, brackets, or any symbols like * or -.
         `;
 
-        const response = await hf.textGeneration({
-          model: "mistralai/Mixtral-8x7B-Instruct-v0.1",
-          inputs: prompt,
-          parameters: {
-            max_new_tokens: 100,
-            temperature: 0.7,
-            return_full_text: false,
+        const apiKey = process.env.MISTRAL_API_KEY;
+        if (!apiKey) {
+          throw new Error("Mistral API key not set");
+        }
+
+        const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
           },
+          body: JSON.stringify({
+            model: 'open-mixtral-8x7b',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 100,
+            temperature: 0.7,
+          }),
         });
 
+        if (!response.ok) {
+          throw new Error(`Mistral API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const generatedText = data.choices[0].message.content;
+
         // Parsing teks yang dihasilkan
-        let distractors = response.generated_text
+        let distractors = generatedText
           .trim()
           .split("\n")
           .map((line) => line.trim())
@@ -647,7 +666,7 @@ const QuizMode = async (req, res) => {
     const generateQuizQuestions = async () => {
       return await Promise.all(
         flashcardsWithProgress.map(async (card) => {
-          // Generate distractors using Hugging Face
+          // Generate distractors using Mistral AI
           const distractors = await generateDistractors(
             card.question,
             card.answer
@@ -2309,8 +2328,8 @@ const startMatch = async (req, res) => {
 // Tambahkan atau ganti handler lama dengan ini
 const submitMatchAnswers = async (req, res) => {
   try {
-    const { id } = req.params;     // Deck ID
-    const { matches } = req.body;  // Array of { questionId, answerId }
+    const { id } = req.params; // Deck ID
+    const { matches } = req.body; // Array of { questionId, answerId }
     const userId = req.user?.id;
 
     if (!userId) {
@@ -2398,7 +2417,7 @@ const submitMatchAnswers = async (req, res) => {
     for (const match of matches) {
       const { questionId, answerId } = match;
       const questionCard = deck.flashcards.find((fc) => fc.id === questionId);
-      const answerCard   = deck.flashcards.find((fc) => fc.id === answerId);
+      const answerCard = deck.flashcards.find((fc) => fc.id === answerId);
       if (!questionCard || !answerCard) continue;
 
       const isCorrect = questionId === answerId;
